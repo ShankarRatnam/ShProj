@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Travel Expense Tracker (INR) — Step 4</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.45); }
+      70% { box-shadow: 0 0 0 10px rgba(225, 29, 72, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+    }
+    .mic-listening {
+      animation: pulse-ring 1.4s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <div class="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+    <!-- Header -->
+    <header class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <div class="flex items-center flex-wrap gap-2">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+            Step 4: Google Sheets Auto-Sync
+          </span>
+          <button
+            type="button"
+            id="toggleSyncPanelBtn"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+          >
+            <span id="syncStatusDot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span id="syncStatusLabel">Connect Google Sheet</span>
+          </button>
+        </div>
+        <h1 class="text-2xl font-bold text-slate-900 mt-1">Travel Expense Tracker</h1>
+        <p class="text-sm text-slate-500">Speak an expense, snap a receipt, and auto-sync to Google Sheets in ₹ INR.</p>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm text-left sm:text-right">
+        <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Trip Total</p>
+        <p id="tripTotal" class="text-2xl font-bold text-emerald-600">₹0.00</p>
+      </div>
+    </header>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg transition-opacity"></div>
+
+    <!-- Collapsible Google Sheets Auto-Sync Setup Panel -->
+    <section id="syncSetupPanel" class="hidden bg-white border border-indigo-200 rounded-2xl p-4 sm:p-5 shadow-sm mb-6">
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">Google Sheets Auto-Sync Setup</h2>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Link this app to your <a href="https://docs.google.com/spreadsheets/d/1FwQjFJyRDE6jngVdIERt9JFrL_uUihtNwEpJ9fr7YW4/edit" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline font-medium">Travel Expense Tracker (INR)</a> Google Sheet so every new expense is appended automatically.
+          </p>
+        </div>
+        <button type="button" id="closeSyncPanelBtn" class="text-slate-400 hover:text-slate-600 text-sm font-bold px-2 py-1">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-600 bg-slate-50 p-3.5 rounded-xl border border-slate-200 mb-4">
+        <p class="font-semibold text-slate-800">One-Time Setup (Takes 60 seconds in your Google Sheet):</p>
+        <ol class="list-decimal list-inside space-y-1.5">
+          <li>Open your <a href="https://docs.google.com/spreadsheets/d/1FwQjFJyRDE6jngVdIERt9JFrL_uUihtNwEpJ9fr7YW4/edit" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline font-medium">Travel Expense Tracker (INR)</a> sheet and click <strong>Extensions → Apps Script</strong>.</li>
+          <li>Replace any code in the editor with the script below and click <strong>Save (💾)</strong>:</li>
+        </ol>
+        <div class="relative">
+          <pre id="appsScriptCode" class="bg-slate-900 text-slate-100 p-3 rounded-lg overflow-x-auto text-[11px] leading-relaxed font-mono">function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Expenses');
+  var data = JSON.parse(e.postData.contents);
+  var rows = Array.isArray(data.rows) ? data.rows : [data];
+  rows.forEach(function(r) {
+    sheet.appendRow([r.travelName, r.category, r.detail, r.dateTime, Number(r.amount)]);
+  });
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+          <button
+            type="button"
+            id="copyScriptBtn"
+            class="absolute top-2 right-2 px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold"
+          >
+            Copy Script
+          </button>
+        </div>
+        <ol start="3" class="list-decimal list-inside space-y-1.5">
+          <li>Click <strong>Deploy → New deployment</strong>, choose gear icon <strong>⚙ → Web app</strong>.</li>
+          <li>Set <em>Execute as</em> to <strong>Me</strong> and <em>Who has access</em> to <strong>Anyone</strong>, then click <strong>Deploy</strong>.</li>
+          <li>Copy the <strong>Web app URL</strong> (ends with <code>/exec</code>) and paste it below:</li>
+        </ol>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input
+          id="webhookUrlInput"
+          type="url"
+          placeholder="https://script.google.com/macros/s/.../exec"
+          class="flex-1 rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <button
+          type="button"
+          id="saveWebhookBtn"
+          class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors whitespace-nowrap"
+        >
+          Save URL
+        </button>
+        <button
+          type="button"
+          id="syncUnsyncedBtn"
+          class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors whitespace-nowrap"
+        >
+          Sync Pending Rows
+        </button>
+      </div>
+    </section>
+
+    <!-- Section 1: Trip Selector / Creator -->
+    <section class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+        <div class="flex-1">
+          <label for="tripSelect" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+            Current Default Travel
+          </label>
+          <select id="tripSelect" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </select>
+        </div>
+        <form id="newTripForm" class="flex flex-1 gap-2">
+          <div class="flex-1">
+            <label for="newTripName" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              Start a New Travel
+            </label>
+            <input
+              id="newTripName"
+              type="text"
+              placeholder="e.g. Mumbai Client Visit"
+              required
+              class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            type="submit"
+            class="self-end px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors whitespace-nowrap"
+          >
+            + New Trip
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Section 2: Add Expense Form (with Voice Note + Default Trip Override) -->
+    <section class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm mb-6">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <h2 class="text-base font-semibold text-slate-900">Add Expense</h2>
+        <span id="nextLineItemBadge" class="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+          Next Line Item: #1
+        </span>
+      </div>
+
+      <!-- Voice Note Bar -->
+      <div class="mb-5 p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+          <button
+            type="button"
+            id="voiceBtn"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors shrink-0"
+          >
+            <span id="voiceBtnIcon">🎤</span>
+            <span id="voiceBtnLabel">Speak Expense</span>
+          </button>
+          <div class="flex-1 min-w-0">
+            <p id="voiceStatus" class="text-xs font-medium text-indigo-900">
+              Try saying: <span class="italic">"Food 420 rupees lunch at airport"</span> or <span class="italic">"Hotel 4500 for Mumbai trip"</span>
+            </p>
+            <div class="mt-2 flex gap-2">
+              <input
+                id="voiceQuickText"
+                type="text"
+                placeholder="Or type/paste a quick note to auto-fill..."
+                class="flex-1 rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                type="button"
+                id="parseQuickTextBtn"
+                class="px-3 py-1.5 rounded-lg bg-white border border-indigo-300 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors whitespace-nowrap"
+              >
+                Auto-Fill
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form id="expenseForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="expenseDate" class="block text-xs font-medium text-slate-600 mb-1">Date & Time</label>
+          <input
+            id="expenseDate"
+            type="datetime-local"
+            required
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label for="expenseCategory" class="block text-xs font-medium text-slate-600 mb-1">Category</label>
+          <select
+            id="expenseCategory"
+            required
+            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="Airport Travel">Airport Travel</option>
+            <option value="Local Travel">Local Travel</option>
+            <option value="Food">Food</option>
+            <option value="Hotel">Hotel</option>
+            <option value="Telephone">Telephone</option>
+            <option value="Others">Others</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="expenseAmount" class="block text-xs font-medium text-slate-600 mb-1">Amount (₹ INR)</label>
+          <div class="relative">
+            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">₹</span>
+            <input
+              id="expenseAmount"
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder="0.00"
+              required
+              class="w-full rounded-xl border border-slate-300 pl-8 pr-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label for="expenseNote" class="block text-xs font-medium text-slate-600 mb-1">Expense Detail</label>
+          <input
+            id="expenseNote"
+            type="text"
+            placeholder="e.g. Cab to Terminal 2"
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <!-- Per-Expense Travel Override (defaults to Current Travel) -->
+        <div class="sm:col-span-2">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-xs text-slate-600">
+              <span class="font-semibold text-slate-700">Save to Travel:</span>
+              <span class="text-slate-500">Defaults to your current travel—change only if this item belongs to a different trip.</span>
+            </div>
+            <select
+              id="expenseTripOverride"
+              class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shrink-0"
+            >
+            </select>
+          </div>
+        </div>
+
+        <!-- Receipt Image Capture -->
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-medium text-slate-600 mb-1.5">Receipt Photo (Auto-tagged to Line Item #)</label>
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50">
+            <label
+              for="receiptInput"
+              class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-sm font-medium text-slate-700 cursor-pointer transition-colors shrink-0"
+            >
+              <span>📷</span>
+              <span>Snap / Upload Receipt</span>
+            </label>
+            <input
+              id="receiptInput"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              class="hidden"
+            />
+            <div id="receiptPreviewBox" class="hidden flex items-center gap-3 flex-1 min-w-0">
+              <img id="receiptPreviewImg" src="" alt="Receipt preview" class="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0" />
+              <div class="min-w-0 flex-1">
+                <p id="receiptAutoTagLabel" class="text-xs font-semibold text-indigo-700 truncate"></p>
+                <p class="text-xs text-slate-500">Ready to save with this expense</p>
+              </div>
+              <button
+                type="button"
+                id="clearReceiptBtn"
+                class="text-xs font-medium text-rose-600 hover:text-rose-700 px-2 py-1 rounded-md hover:bg-rose-50"
+              >
+                Remove
+              </button>
+            </div>
+            <p id="receiptEmptyHint" class="text-xs text-slate-400">Optional — opens your camera on mobile or file picker on laptop.</p>
+          </div>
+        </div>
+
+        <div class="sm:col-span-2 flex justify-end">
+          <button
+            type="submit"
+            class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
+          >
+            Add Expense
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section 3: Expense List -->
+    <section class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div>
+          <h2 class="text-base font-semibold text-slate-900">
+            Expenses for <span id="activeTripLabel" class="text-indigo-600"></span>
+          </h2>
+          <span id="expenseCount" class="text-xs font-medium text-slate-500">0 items</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            id="openSyncBtn"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-xs font-semibold text-indigo-700 transition-colors"
+          >
+            <span>☁ Sheets Auto-Sync</span>
+          </button>
+          <button
+            type="button"
+            id="exportCsvBtn"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+          >
+            <span>⬇ Export CSV for Sheets</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="expenseList" class="space-y-2.5"></div>
+    </section>
+
+    <!-- Hidden input for attaching receipt to an existing row -->
+    <input id="rowReceiptInput" type="file" accept="image/*" capture="environment" class="hidden" />
+  </div>
+
+  <!-- Receipt Lightbox Modal -->
+  <div id="receiptModal" class="hidden fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-xl">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+        <div>
+          <p id="modalTitle" class="text-sm font-bold text-slate-900"></p>
+          <p id="modalSubtitle" class="text-xs text-slate-500"></p>
+        </div>
+        <button type="button" id="closeModalBtn" class="text-slate-400 hover:text-slate-700 text-lg font-bold px-2 py-1">✕</button>
+      </div>
+      <div class="p-4 bg-slate-100 flex justify-center">
+        <img id="modalImg" src="" alt="Receipt full view" class="max-h-[60vh] w-auto rounded-lg object-contain" />
+      </div>
+      <div class="px-4 py-3 flex items-center justify-between bg-white border-t border-slate-200">
+        <span id="modalTagBadge" class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md"></span>
+        <a id="modalDownloadLink" href="#" download="receipt.jpg" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors">
+          Download Photo
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'travel_expense_tracker_v1';
+
+    const CATEGORY_STYLES = {
+      'Airport Travel': 'bg-sky-100 text-sky-700',
+      'Local Travel': 'bg-amber-100 text-amber-700',
+      'Food': 'bg-rose-100 text-rose-700',
+      'Hotel': 'bg-violet-100 text-violet-700',
+      'Telephone': 'bg-teal-100 text-teal-700',
+      'Others': 'bg-slate-100 text-slate-700'
+    };
+
+    const CATEGORY_KEYWORDS = [
+      { category: 'Airport Travel', words: ['airport', 'flight', 'airline', 'terminal', 'boarding', 'lounge'] },
+      { category: 'Local Travel', words: ['local', 'cab', 'taxi', 'uber', 'ola', 'rapido', 'auto', 'rickshaw', 'metro', 'bus', 'train', 'petrol', 'fuel', 'parking', 'toll'] },
+      { category: 'Food', words: ['food', 'lunch', 'dinner', 'breakfast', 'coffee', 'tea', 'snack', 'meal', 'restaurant', 'cafe', 'water', 'drinks'] },
+      { category: 'Hotel', words: ['hotel', 'stay', 'room', 'lodge', 'resort', 'accommodation', 'check-in', 'checkin'] },
+      { category: 'Telephone', words: ['telephone', 'phone', 'mobile', 'sim', 'recharge', 'data', 'roaming', 'wifi', 'call'] }
+    ];
+
+    function getNowDateTimeLocal() {
+      const now = new Date();
+      const offset = now.getTimezoneOffset();
+      const local = new Date(now.getTime() - offset * 60000);
+      return local.toISOString().slice(0, 16);
+    }
+
+    function formatDisplayDate(dt) {
+      if (!dt) return '';
+      return dt.replace('T', ' ');
+    }
+
+    function formatINR(amount) {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount);
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.trips) && parsed.trips.length > 0) {
+            if (typeof parsed.sheetsWebhookUrl !== 'string') {
+              parsed.sheetsWebhookUrl = '';
+            }
+            return parsed;
+          }
+        }
+      } catch (e) {
+        // Fallback to default in-memory state
+      }
+
+      const defaultId = 'trip-' + Date.now();
+      return {
+        activeTripId: defaultId,
+        sheetsWebhookUrl: '',
+        trips: [
+          {
+            id: defaultId,
+            name: 'Sample Trip — Bengaluru',
+            expenses: [
+              {
+                id: 'exp-1',
+                lineNumber: 1,
+                date: getNowDateTimeLocal(),
+                category: 'Airport Travel',
+                amount: 1250,
+                note: 'Airport taxi from home',
+                receiptDataUrl: '',
+                usedVoice: false,
+                syncedToSheets: true
+              },
+              {
+                id: 'exp-2',
+                lineNumber: 2,
+                date: getNowDateTimeLocal(),
+                category: 'Food',
+                amount: 420,
+                note: 'Lunch at airport',
+                receiptDataUrl: '',
+                usedVoice: false,
+                syncedToSheets: true
+              }
+            ]
+          }
+        ]
+      };
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        showToast('Storage full — try removing old receipt photos');
+      }
+    }
+
+    let state = loadState();
+    let pendingReceiptDataUrl = '';
+    let pendingUsedVoice = false;
+    let pendingRowAttachId = null;
+    let toastTimer = null;
+    let recognition = null;
+    let isListening = false;
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 2800);
+    }
+
+    function getTripById(id) {
+      return state.trips.find((t) => t.id === id) || state.trips[0];
+    }
+
+    function getActiveTrip() {
+      return getTripById(state.activeTripId);
+    }
+
+    function getFormTargetTrip() {
+      const overrideSelect = document.getElementById('expenseTripOverride');
+      return getTripById(overrideSelect.value || state.activeTripId);
+    }
+
+    function getNextLineNumber(trip) {
+      if (!trip || trip.expenses.length === 0) return 1;
+      return Math.max(...trip.expenses.map((e) => e.lineNumber)) + 1;
+    }
+
+    // Send one or more rows directly to Google Sheets Apps Script Webhook
+    async function pushRowsToGoogleSheets(rowsPayload) {
+      const url = (state.sheetsWebhookUrl || '').trim();
+      if (!url) return false;
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ rows: rowsPayload })
+        });
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+
+    function compressImageFile(file, callback) {
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        const img = new Image();
+        img.onload = function () {
+          const maxWidth = 900;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.72);
+          callback(compressed);
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function updateNextLineBadgeAndReceipt() {
+      const targetTrip = getFormTargetTrip();
+      const nextLine = getNextLineNumber(targetTrip);
+      document.getElementById('nextLineItemBadge').textContent = `Next Line Item: #${nextLine}`;
+
+      const previewBox = document.getElementById('receiptPreviewBox');
+      const emptyHint = document.getElementById('receiptEmptyHint');
+      const previewImg = document.getElementById('receiptPreviewImg');
+      const tagLabel = document.getElementById('receiptAutoTagLabel');
+
+      if (pendingReceiptDataUrl) {
+        previewImg.src = pendingReceiptDataUrl;
+        tagLabel.textContent = `Auto-tagged to ${targetTrip.name} #${nextLine}`;
+        previewBox.classList.remove('hidden');
+        emptyHint.classList.add('hidden');
+      } else {
+        previewImg.src = '';
+        previewBox.classList.add('hidden');
+        emptyHint.classList.remove('hidden');
+      }
+    }
+
+    function updateSyncStatusBadge() {
+      const dot = document.getElementById('syncStatusDot');
+      const label = document.getElementById('syncStatusLabel');
+      const urlInput = document.getElementById('webhookUrlInput');
+      const hasUrl = Boolean((state.sheetsWebhookUrl || '').trim());
+
+      if (document.activeElement !== urlInput) {
+        urlInput.value = state.sheetsWebhookUrl || '';
+      }
+
+      if (hasUrl) {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        label.textContent = 'Sheets Auto-Sync: Connected';
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-500';
+        label.textContent = 'Connect Google Sheet';
+      }
+    }
+
+    function parseVoiceInput(text) {
+      const raw = text.trim();
+      if (!raw) return;
+
+      const lower = raw.toLowerCase();
+
+      // 1. Detect Category
+      let matchedCategory = 'Others';
+      for (const entry of CATEGORY_KEYWORDS) {
+        if (entry.words.some((w) => new RegExp(`\\b${w}\\b`, 'i').test(lower))) {
+          matchedCategory = entry.category;
+          break;
+        }
+      }
+      document.getElementById('expenseCategory').value = matchedCategory;
+
+      // 2. Detect Amount (first valid number)
+      const numMatch = raw.replace(/,/g, '').match(/(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d{1,2})?)/i);
+      if (numMatch && numMatch[1]) {
+        document.getElementById('expenseAmount').value = parseFloat(numMatch[1]);
+      }
+
+      // 3. Detect if user specifically mentioned a different existing trip
+      let matchedTrip = null;
+      for (const trip of state.trips) {
+        const tripWords = trip.name.toLowerCase().split(/[\s—-]+/).filter((w) => w.length >= 3);
+        if (
+          lower.includes(trip.name.toLowerCase()) ||
+          tripWords.some((tw) => new RegExp(`(?:for|trip|travel)\\s+${tw}\\b`, 'i').test(lower))
+        ) {
+          matchedTrip = trip;
+          break;
+        }
+      }
+      if (matchedTrip) {
+        document.getElementById('expenseTripOverride').value = matchedTrip.id;
+        updateNextLineBadgeAndReceipt();
+      } else {
+        document.getElementById('expenseTripOverride').value = state.activeTripId;
+        updateNextLineBadgeAndReceipt();
+      }
+
+      // 4. Clean up Detail text
+      let detail = raw
+        .replace(/(?:₹|rs\.?|inr)\s*/gi, '')
+        .replace(/\brupees?\b/gi, '')
+        .replace(/\b\d+(?:,\d{3})*(?:\.\d{1,2})?\b/, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      document.getElementById('expenseNote').value = detail || raw;
+      pendingUsedVoice = true;
+
+      const targetName = matchedTrip ? matchedTrip.name : getActiveTrip().name;
+      document.getElementById('voiceStatus').textContent = `Heard: "${raw}" → Filled (${matchedCategory}, ${targetName})`;
+      showToast('Voice details auto-filled!');
+    }
+
+    function setupVoiceRecognition() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const voiceBtn = document.getElementById('voiceBtn');
+      const voiceBtnLabel = document.getElementById('voiceBtnLabel');
+      const voiceStatus = document.getElementById('voiceStatus');
+
+      if (!SpeechRec) {
+        voiceBtn.addEventListener('click', () => {
+          voiceStatus.textContent = 'Live mic is not supported in this browser preview. Use the quick text box below or open on Chrome/Android!';
+          showToast('Use Chrome/Android for live mic, or type below');
+        });
+        return;
+      }
+
+      recognition = new SpeechRec();
+      recognition.lang = 'en-IN';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        isListening = true;
+        voiceBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+        voiceBtn.classList.add('bg-rose-600', 'hover:bg-rose-700', 'mic-listening');
+        voiceBtnLabel.textContent = 'Listening... Tap to Stop';
+        voiceStatus.textContent = 'Listening now — speak category, amount in rupees, and detail...';
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('voiceQuickText').value = transcript;
+        parseVoiceInput(transcript);
+      };
+
+      recognition.onerror = (event) => {
+        voiceStatus.textContent = `Mic error (${event.error}). You can type or paste your note below instead.`;
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        voiceBtn.classList.remove('bg-rose-600', 'hover:bg-rose-700', 'mic-listening');
+        voiceBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+        voiceBtnLabel.textContent = 'Speak Expense';
+      };
+
+      voiceBtn.addEventListener('click', () => {
+        if (isListening) {
+          recognition.stop();
+        } else {
+          try {
+            recognition.start();
+          } catch (err) {
+            voiceStatus.textContent = 'Could not start mic — check browser permission or type below.';
+          }
+        }
+      });
+    }
+
+    function render() {
+      const tripSelect = document.getElementById('tripSelect');
+      const overrideSelect = document.getElementById('expenseTripOverride');
+      const activeTrip = getActiveTrip();
+      state.activeTripId = activeTrip.id;
+
+      updateSyncStatusBadge();
+
+      // Populate both trip dropdowns (Current Default Travel + Per-Expense Override)
+      tripSelect.innerHTML = '';
+      overrideSelect.innerHTML = '';
+      state.trips.forEach((trip) => {
+        const opt1 = document.createElement('option');
+        opt1.value = trip.id;
+        opt1.textContent = trip.name;
+        if (trip.id === activeTrip.id) opt1.selected = true;
+        tripSelect.appendChild(opt1);
+
+        const opt2 = document.createElement('option');
+        opt2.value = trip.id;
+        opt2.textContent = trip.id === activeTrip.id ? `${trip.name} (Default)` : trip.name;
+        if (trip.id === activeTrip.id) opt2.selected = true;
+        overrideSelect.appendChild(opt2);
+      });
+
+      // Update labels & total
+      document.getElementById('activeTripLabel').textContent = activeTrip.name;
+      const total = activeTrip.expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      document.getElementById('tripTotal').textContent = formatINR(total);
+      document.getElementById('expenseCount').textContent =
+        activeTrip.expenses.length === 1 ? '1 item' : `${activeTrip.expenses.length} items`;
+
+      updateNextLineBadgeAndReceipt();
+
+      // Render expense list for active trip
+      const listEl = document.getElementById('expenseList');
+      listEl.innerHTML = '';
+
+      if (activeTrip.expenses.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-center py-8 border border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">
+            No expenses logged for this trip yet. Speak or add your first expense above!
+          </div>
+        `;
+        return;
+      }
+
+      activeTrip.expenses.forEach((exp) => {
+        const badgeStyle = CATEGORY_STYLES[exp.category] || CATEGORY_STYLES['Others'];
+        const row = document.createElement('div');
+        row.className =
+          'flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50/50 transition-colors';
+
+        const receiptBlock = exp.receiptDataUrl
+          ? `<button type="button" data-view-receipt="${exp.id}" class="group relative shrink-0" title="View receipt tagged #${exp.lineNumber}">
+               <img src="${exp.receiptDataUrl}" alt="Receipt #${exp.lineNumber}" class="w-11 h-11 rounded-lg object-cover border border-indigo-200 group-hover:ring-2 group-hover:ring-indigo-500" />
+               <span class="absolute -top-1.5 -right-1.5 bg-indigo-600 text-white text-[10px] font-bold px-1 rounded">
+                 #${exp.lineNumber}
+               </span>
+             </button>`
+          : `<button type="button" data-attach-receipt="${exp.id}" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2 py-1.5 rounded-lg border border-indigo-200 transition-colors shrink-0">
+               + Photo
+             </button>`;
+
+        const voiceBadge = exp.usedVoice
+          ? `<span class="text-xs" title="Added via Voice Note">🎤</span>`
+          : '';
+
+        const syncBadge = exp.syncedToSheets
+          ? `<span class="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded" title="Synced to Google Sheets">☁ Synced</span>`
+          : `<span class="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded" title="Saved locally — connect Sheet to sync">Local</span>`;
+
+        row.innerHTML = `
+          <div class="flex items-start sm:items-center gap-3 min-w-0">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-200 text-slate-700 text-xs font-bold shrink-0">
+              #${exp.lineNumber}
+            </span>
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${badgeStyle}">
+                  ${escapeHtml(exp.category)}
+                </span>
+                <span class="text-xs text-slate-500">${escapeHtml(formatDisplayDate(exp.date))}</span>
+                ${voiceBadge}
+                ${syncBadge}
+              </div>
+              <p class="text-sm text-slate-700 mt-1 truncate">
+                ${exp.note ? escapeHtml(exp.note) : '<span class="text-slate-400 italic">No detail</span>'}
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
+            ${receiptBlock}
+            <span class="text-base font-bold text-slate-900 ml-1">${formatINR(exp.amount)}</span>
+            <button
+              type="button"
+              data-delete-id="${exp.id}"
+              class="text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        `;
+        listEl.appendChild(row);
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function csvCell(val) {
+      const str = String(val == null ? '' : val);
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+
+    function openReceiptModal(exp, tripName) {
+      document.getElementById('modalTitle').textContent = `Line Item #${exp.lineNumber} — ${exp.category}`;
+      document.getElementById('modalSubtitle').textContent = `${tripName} • ${formatDisplayDate(exp.date)} • ${formatINR(exp.amount)}`;
+      document.getElementById('modalImg').src = exp.receiptDataUrl;
+      document.getElementById('modalTagBadge').textContent = `Tag: ${tripName} #${exp.lineNumber}`;
+      const dl = document.getElementById('modalDownloadLink');
+      dl.href = exp.receiptDataUrl;
+      dl.download = `LineItem_${exp.lineNumber}_receipt.jpg`;
+      document.getElementById('receiptModal').classList.remove('hidden');
+    }
+
+    function toggleSyncPanel() {
+      const panel = document.getElementById('syncSetupPanel');
+      panel.classList.toggle('hidden');
+    }
+
+    // Event Listeners
+    document.getElementById('toggleSyncPanelBtn').addEventListener('click', toggleSyncPanel);
+    document.getElementById('openSyncBtn').addEventListener('click', () => {
+      document.getElementById('syncSetupPanel').classList.remove('hidden');
+      document.getElementById('syncSetupPanel').scrollIntoView({ behavior: 'smooth' });
+    });
+    document.getElementById('closeSyncPanelBtn').addEventListener('click', () => {
+      document.getElementById('syncSetupPanel').classList.add('hidden');
+    });
+
+    document.getElementById('copyScriptBtn').addEventListener('click', () => {
+      const code = document.getElementById('appsScriptCode').textContent;
+      const ta = document.createElement('textarea');
+      ta.value = code;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('Apps Script copied to clipboard!');
+      } catch (e) {
+        showToast('Select and copy the script manually');
+      }
+      document.body.removeChild(ta);
+    });
+
+    document.getElementById('saveWebhookBtn').addEventListener('click', () => {
+      const url = document.getElementById('webhookUrlInput').value.trim();
+      state.sheetsWebhookUrl = url;
+      saveState();
+      render();
+      showToast(url ? 'Google Sheets Webhook URL saved!' : 'Webhook URL cleared');
+    });
+
+    document.getElementById('syncUnsyncedBtn').addEventListener('click', async () => {
+      const url = (state.sheetsWebhookUrl || '').trim();
+      if (!url) {
+        showToast('Paste and save your Apps Script Web App URL first');
+        return;
+      }
+
+      const unsyncedPayload = [];
+      const unsyncedItems = [];
+      state.trips.forEach((trip) => {
+        trip.expenses.forEach((exp) => {
+          if (!exp.syncedToSheets) {
+            unsyncedPayload.push({
+              travelName: trip.name,
+              category: exp.category,
+              detail: exp.note || '',
+              dateTime: formatDisplayDate(exp.date),
+              amount: exp.amount
+            });
+            unsyncedItems.push(exp);
+          }
+        });
+      });
+
+      if (unsyncedPayload.length === 0) {
+        showToast('All expenses are already synced!');
+        return;
+      }
+
+      showToast(`Syncing ${unsyncedPayload.length} row(s) to Google Sheets...`);
+      const ok = await pushRowsToGoogleSheets(unsyncedPayload);
+      if (ok) {
+        unsyncedItems.forEach((item) => {
+          item.syncedToSheets = true;
+        });
+        saveState();
+        render();
+        showToast(`Synced ${unsyncedPayload.length} row(s) to Google Sheets!`);
+      } else {
+        showToast('Could not reach Webhook URL — check your link');
+      }
+    });
+
+    document.getElementById('tripSelect').addEventListener('change', (e) => {
+      state.activeTripId = e.target.value;
+      saveState();
+      render();
+    });
+
+    document.getElementById('expenseTripOverride').addEventListener('change', () => {
+      updateNextLineBadgeAndReceipt();
+    });
+
+    document.getElementById('newTripForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('newTripName');
+      const name = input.value.trim();
+      if (!name) return;
+
+      const newTrip = {
+        id: 'trip-' + Date.now(),
+        name,
+        expenses: []
+      };
+      state.trips.unshift(newTrip);
+      state.activeTripId = newTrip.id;
+      input.value = '';
+      saveState();
+      render();
+      showToast(`Started trip: ${name}`);
+    });
+
+    document.getElementById('parseQuickTextBtn').addEventListener('click', () => {
+      const val = document.getElementById('voiceQuickText').value;
+      parseVoiceInput(val);
+    });
+
+    document.getElementById('receiptInput').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      compressImageFile(file, (dataUrl) => {
+        pendingReceiptDataUrl = dataUrl;
+        updateNextLineBadgeAndReceipt();
+        const nextLine = getNextLineNumber(getFormTargetTrip());
+        showToast(`Receipt auto-tagged to #${nextLine}`);
+      });
+    });
+
+    document.getElementById('clearReceiptBtn').addEventListener('click', () => {
+      pendingReceiptDataUrl = '';
+      document.getElementById('receiptInput').value = '';
+      updateNextLineBadgeAndReceipt();
+    });
+
+    document.getElementById('expenseForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const date = document.getElementById('expenseDate').value;
+      const category = document.getElementById('expenseCategory').value;
+      const amount = parseFloat(document.getElementById('expenseAmount').value);
+      const note = document.getElementById('expenseNote').value.trim();
+
+      if (!date || isNaN(amount) || amount <= 0) return;
+
+      const targetTrip = getFormTargetTrip();
+      const lineNumber = getNextLineNumber(targetTrip);
+
+      const newExp = {
+        id: 'exp-' + Date.now(),
+        lineNumber,
+        date,
+        category,
+        amount,
+        note,
+        receiptDataUrl: pendingReceiptDataUrl,
+        usedVoice: pendingUsedVoice,
+        syncedToSheets: false
+      };
+
+      targetTrip.expenses.push(newExp);
+
+      pendingReceiptDataUrl = '';
+      pendingUsedVoice = false;
+      document.getElementById('receiptInput').value = '';
+      document.getElementById('expenseAmount').value = '';
+      document.getElementById('expenseNote').value = '';
+      document.getElementById('voiceQuickText').value = '';
+      document.getElementById('expenseDate').value = getNowDateTimeLocal();
+      saveState();
+      render();
+
+      const suffix = targetTrip.id !== state.activeTripId ? ` to ${targetTrip.name}` : '';
+      if ((state.sheetsWebhookUrl || '').trim()) {
+        const ok = await pushRowsToGoogleSheets([
+          {
+            travelName: targetTrip.name,
+            category: newExp.category,
+            detail: newExp.note || '',
+            dateTime: formatDisplayDate(newExp.date),
+            amount: newExp.amount
+          }
+        ]);
+        if (ok) {
+          newExp.syncedToSheets = true;
+          saveState();
+          render();
+          showToast(`Added #${lineNumber} & synced to Google Sheets!`);
+          return;
+        }
+      }
+      showToast(`Added #${lineNumber} (${formatINR(amount)})${suffix}`);
+    });
+
+    document.getElementById('expenseList').addEventListener('click', (e) => {
+      const deleteBtn = e.target.closest('[data-delete-id]');
+      if (deleteBtn) {
+        const id = deleteBtn.getAttribute('data-delete-id');
+        const activeTrip = getActiveTrip();
+        activeTrip.expenses = activeTrip.expenses.filter((item) => item.id !== id);
+        saveState();
+        render();
+        showToast('Expense removed');
+        return;
+      }
+
+      const viewBtn = e.target.closest('[data-view-receipt]');
+      if (viewBtn) {
+        const id = viewBtn.getAttribute('data-view-receipt');
+        const activeTrip = getActiveTrip();
+        const exp = activeTrip.expenses.find((item) => item.id === id);
+        if (exp && exp.receiptDataUrl) {
+          openReceiptModal(exp, activeTrip.name);
+        }
+        return;
+      }
+
+      const attachBtn = e.target.closest('[data-attach-receipt]');
+      if (attachBtn) {
+        pendingRowAttachId = attachBtn.getAttribute('data-attach-receipt');
+        const rowInput = document.getElementById('rowReceiptInput');
+        rowInput.value = '';
+        rowInput.click();
+      }
+    });
+
+    document.getElementById('rowReceiptInput').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file || !pendingRowAttachId) return;
+      const targetId = pendingRowAttachId;
+      pendingRowAttachId = null;
+
+      compressImageFile(file, (dataUrl) => {
+        const activeTrip = getActiveTrip();
+        const exp = activeTrip.expenses.find((item) => item.id === targetId);
+        if (exp) {
+          exp.receiptDataUrl = dataUrl;
+          saveState();
+          render();
+          showToast(`Photo tagged to Line Item #${exp.lineNumber}`);
+        }
+      });
+    });
+
+    document.getElementById('closeModalBtn').addEventListener('click', () => {
+      document.getElementById('receiptModal').classList.add('hidden');
+    });
+
+    document.getElementById('receiptModal').addEventListener('click', (e) => {
+      if (e.target.id === 'receiptModal') {
+        document.getElementById('receiptModal').classList.add('hidden');
+      }
+    });
+
+    document.getElementById('exportCsvBtn').addEventListener('click', () => {
+      const rows = [['Travel Name', 'Expense Category', 'Expense Detail', 'Date & Time', 'Amount (INR)']];
+      state.trips.forEach((trip) => {
+        trip.expenses.forEach((exp) => {
+          rows.push([
+            trip.name,
+            exp.category,
+            exp.note || '',
+            formatDisplayDate(exp.date),
+            Number(exp.amount).toFixed(2)
+          ]);
+        });
+      });
+
+      const csvContent = rows.map((r) => r.map(csvCell).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'travel_expenses.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Exported CSV for Google Sheets');
+    });
+
+    // Initialize default date & time, voice recognition, and render
+    document.getElementById('expenseDate').value = getNowDateTimeLocal();
+    setupVoiceRecognition();
+    render();
+  </script>
+</body>
+</html>
