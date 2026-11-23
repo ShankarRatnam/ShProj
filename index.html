@@ -73,15 +73,69 @@
           <li>Replace any code in the editor with the script below and click <strong>Save (💾)</strong>:</li>
         </ol>
         <div class="relative">
-          <pre id="appsScriptCode" class="bg-slate-900 text-slate-100 p-3 rounded-lg overflow-x-auto text-[11px] leading-relaxed font-mono">function doPost(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Expenses');
+          <pre id="appsScriptCode" class="bg-slate-900 text-slate-100 p-3 rounded-lg overflow-x-auto text-[11px] leading-relaxed font-mono">// Parameter: Drive folder ID where trip subfolders are created.
+// Leave '' to use a 'Travel Bills' folder in My Drive instead.
+var ROOT_FOLDER_ID = '1I2Gtoxtu77OCiOOWpO_pl48agsUo5Pzi';
+
+function doPost(e) {
   var data = JSON.parse(e.postData.contents);
+  if (data.action === 'photo') return savePhoto_(data);
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Expenses');
   var rows = Array.isArray(data.rows) ? data.rows : [data];
   rows.forEach(function(r) {
     sheet.appendRow([r.travelName, r.category, r.detail, r.dateTime, Number(r.amount)]);
   });
-  return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+  return json_({ status: 'ok' });
+}
+
+function json_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function clean_(s) {
+  return String(s || '').replace(/[^\w .()-]/g, '-').trim();
+}
+
+function folder_(parent, name) {
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+function rootFolder_() {
+  return ROOT_FOLDER_ID
+    ? DriveApp.getFolderById(ROOT_FOLDER_ID)
+    : folder_(DriveApp.getRootFolder(), 'Travel Bills');
+}
+
+// Saves to Drive: <root folder> / TripName / TripName_Category_YYYY-MM-DD_NN.jpg
+function savePhoto_(d) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var trip = clean_(d.travelName) || 'Unnamed Trip';
+    var sub = folder_(rootFolder_(), trip);
+    var prefix = trip + '_' + clean_(d.category) + '_' + d.date + '_';
+    var max = 0;
+    var files = sub.getFiles();
+    while (files.hasNext()) {
+      var name = files.next().getName();
+      if (name.indexOf(prefix) === 0) {
+        var m = name.substring(prefix.length).match(/^(\d+)\./);
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      }
+    }
+    var seq = String(max + 1);
+    if (seq.length === 1) seq = '0' + seq;
+    var fileName = prefix + seq + '.jpg';
+    var blob = Utilities.newBlob(Utilities.base64Decode(d.imageBase64), 'image/jpeg', fileName);
+    var file = sub.createFile(blob);
+    return json_({ status: 'ok', fileName: fileName, url: file.getUrl() });
+  } catch (err) {
+    return json_({ status: 'error', message: String(err) });
+  } finally {
+    lock.releaseLock();
+  }
 }</pre>
           <button
             type="button"
@@ -92,7 +146,7 @@
           </button>
         </div>
         <ol start="3" class="list-decimal list-inside space-y-1.5">
-          <li>Click <strong>Deploy → New deployment</strong>, choose gear icon <strong>⚙ → Web app</strong>.</li>
+          <li>Click <strong>Deploy → New deployment</strong>, choose gear icon <strong>⚙ → Web app</strong>. (Already deployed? Use <strong>Deploy → Manage deployments → ✏ Edit → Version: New version</strong> and approve the Google Drive permission when asked. Receipt photos then save to Drive under your root folder (set <code>ROOT_FOLDER_ID</code> at the top of the script) / <strong>trip name</strong>.)</li>
           <li>Set <em>Execute as</em> to <strong>Me</strong> and <em>Who has access</em> to <strong>Anyone</strong>, then click <strong>Deploy</strong>.</li>
           <li>Copy the <strong>Web app URL</strong> (ends with <code>/exec</code>) and paste it below:</li>
         </ol>
@@ -524,6 +578,39 @@
       }
     }
 
+    // Upload a receipt photo to Drive: Travel Bills / <trip name> / <Trip>_<Category>_<date>_<NN>.jpg
+    async function uploadReceiptToDrive(trip, exp) {
+      const url = (state.sheetsWebhookUrl || '').trim();
+      if (!url || !exp.receiptDataUrl || exp.photoSaved || exp.photoUploading) return false;
+      exp.photoUploading = true;
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'photo',
+            travelName: trip.name,
+            category: exp.category,
+            date: String(exp.date).slice(0, 10),
+            imageBase64: exp.receiptDataUrl.split(',')[1]
+          })
+        });
+        const out = await res.json();
+        if (out && out.status === 'ok') {
+          exp.photoSaved = true;
+          exp.photoFileName = out.fileName;
+          return true;
+        }
+        return false;
+      } catch (err) {
+        return false;
+      } finally {
+        delete exp.photoUploading;
+        saveState();
+        render();
+      }
+    }
+
     function compressImageFile(file, callback) {
       const reader = new FileReader();
       reader.onload = function (ev) {
@@ -899,8 +986,19 @@
         });
       });
 
+      // Retry any receipt photos not yet saved to Drive
+      let photoCount = 0;
+      for (const trip of state.trips) {
+        for (const exp of trip.expenses) {
+          if (exp.receiptDataUrl && !exp.photoSaved) {
+            if (await uploadReceiptToDrive(trip, exp)) photoCount++;
+          }
+        }
+      }
+      if (photoCount > 0) showToast(`Saved ${photoCount} photo(s) to Drive`);
+
       if (unsyncedPayload.length === 0) {
-        showToast('All expenses are already synced!');
+        if (photoCount === 0) showToast('All expenses are already synced!');
         return;
       }
 
@@ -1006,6 +1104,11 @@
       render();
 
       const suffix = targetTrip.id !== state.activeTripId ? ` to ${targetTrip.name}` : '';
+      if ((state.sheetsWebhookUrl || '').trim() && newExp.receiptDataUrl) {
+        uploadReceiptToDrive(targetTrip, newExp).then((ok) => {
+          showToast(ok ? `Photo saved to Drive: ${newExp.photoFileName}` : 'Photo not saved to Drive yet — tap Sync to retry');
+        });
+      }
       if ((state.sheetsWebhookUrl || '').trim()) {
         const ok = await pushRowsToGoogleSheets([
           {
@@ -1073,6 +1176,10 @@
           saveState();
           render();
           showToast(`Photo tagged to Line Item #${exp.lineNumber}`);
+          exp.photoSaved = false;
+          uploadReceiptToDrive(activeTrip, exp).then((ok) => {
+            if (ok) showToast(`Photo saved to Drive: ${exp.photoFileName}`);
+          });
         }
       });
     });
