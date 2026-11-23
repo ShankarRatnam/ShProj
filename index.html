@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -100,6 +101,14 @@ function clean_(s) {
 function folder_(parent, name) {
   var it = parent.getFoldersByName(name);
   return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+// Run this ONCE from the editor (select authorizeDrive, click Run) to grant Drive access.
+function authorizeDrive() {
+  // Creates then trashes a temp folder so Google asks for FULL Drive access.
+  var f = rootFolder_().createFolder('_auth_check');
+  f.setTrashed(true);
+  Logger.log('Drive OK: ' + rootFolder_().getName());
 }
 
 function rootFolder_() {
@@ -578,7 +587,8 @@ function savePhoto_(d) {
       }
     }
 
-    // Upload a receipt photo to Drive: Travel Bills / <trip name> / <Trip>_<Category>_<date>_<NN>.jpg
+    let lastDriveError = '';
+    // Upload a receipt photo to Drive: <root folder> / <trip name> / <Trip>_<Category>_<date>_<NN>.jpg
     async function uploadReceiptToDrive(trip, exp) {
       const url = (state.sheetsWebhookUrl || '').trim();
       if (!url || !exp.receiptDataUrl || exp.photoSaved || exp.photoUploading) return false;
@@ -595,14 +605,27 @@ function savePhoto_(d) {
             imageBase64: exp.receiptDataUrl.split(',')[1]
           })
         });
-        const out = await res.json();
-        if (out && out.status === 'ok') {
+        const text = await res.text();
+        let out = null;
+        try { out = JSON.parse(text); } catch (e) { /* not JSON */ }
+        if (out && out.status === 'ok' && out.fileName) {
           exp.photoSaved = true;
           exp.photoFileName = out.fileName;
+          lastDriveError = '';
           return true;
         }
+        if (out && out.status === 'ok') {
+          lastDriveError = 'Script is the OLD version - paste the new script and redeploy as New version';
+        } else if (out && out.message) {
+          lastDriveError = out.message;
+        } else {
+          lastDriveError = 'HTTP ' + res.status + ' - unexpected reply (script not authorised for Drive / access not set to Anyone?)';
+        }
+        console.error('Drive upload failed:', lastDriveError, text.slice(0, 300));
         return false;
       } catch (err) {
+        lastDriveError = 'Network/CORS error: ' + err.message;
+        console.error('Drive upload failed:', err);
         return false;
       } finally {
         delete exp.photoUploading;
@@ -1106,7 +1129,7 @@ function savePhoto_(d) {
       const suffix = targetTrip.id !== state.activeTripId ? ` to ${targetTrip.name}` : '';
       if ((state.sheetsWebhookUrl || '').trim() && newExp.receiptDataUrl) {
         uploadReceiptToDrive(targetTrip, newExp).then((ok) => {
-          showToast(ok ? `Photo saved to Drive: ${newExp.photoFileName}` : 'Photo not saved to Drive yet — tap Sync to retry');
+          showToast(ok ? `Photo saved to Drive: ${newExp.photoFileName}` : 'Drive upload failed: ' + lastDriveError);
         });
       }
       if ((state.sheetsWebhookUrl || '').trim()) {
